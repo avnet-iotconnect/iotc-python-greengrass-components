@@ -1,0 +1,230 @@
+# SPDX-License-Identifier: MIT
+# Copyright (C) 2024 Avnet
+# Authors: Zackary Andraka <zackary.andraka@avnet.com> et al.
+
+import sys
+import time
+import threading
+import asyncio
+import struct
+import pexpect
+from bleak import BleakClient, BleakScanner
+from bleak.backends.characteristic import BleakGATTCharacteristic
+
+from avnet.iotconnect.sdk.greengrass import Client, C2dCommand, Callbacks
+from avnet.iotconnect.sdk.sdklib.mqtt import C2dAck
+
+telemetry = {
+    'temperature_deg_C': 0,
+    'battery_percentage': 0,
+    'battery_voltage': 0,
+    'battery_current': 0,
+    'battery_status': 'Not_Available',
+    'accel_x_mGs': 0,
+    'accel_y_mGs': 0,
+    'accel_z_mGs': 0,
+    'gyro_x_dps': 0,
+    'gyro_y_dps': 0,
+    'gyro_z_dps': 0,
+    'rms_speed_status_x': 'Not_Available',
+    'rms_speed_status_y': 'Not_Available',
+    'rms_speed_status_z': 'Not_Available',
+    'rms_speed_x_mmps': 0,
+    'rms_speed_y_mmps': 0,
+    'rms_speed_z_mmps': 0,
+    'freq_status_x': 'Not_Available',
+    'freq_status_y': 'Not_Available',
+    'freq_status_z': 'Not_Available',
+    'freq_x_hz': 0,
+    'freq_y_hz': 0,
+    'freq_z_hz': 0,
+    'freq_max_amp_x_ms2': 0,
+    'freq_max_amp_y_ms2': 0,
+    'freq_max_amp_z_ms2': 0,
+    'accel_peak_status_x': 'Not_Available',
+    'accel_peak_status_y': 'Not_Available',
+    'accel_peak_status_z': 'Not_Available',
+    'accel_peak_x_ms2': 0,
+    'accel_peak_y_ms2': 0,
+    'accel_peak_z_ms2': 0
+}
+
+telemetry_lock = threading.Lock()
+
+temperature_characteristic = '00040000-0001-11e1-ac36-0002a5d5c51b'
+accel_and_gyro_characteristic = '00c00000-0001-11e1-ac36-0002a5d5c51b'
+battery_characteristic = '00020000-0001-11e1-ac36-0002a5d5c51b'
+rms_speed_characteristic = '00000007-0002-11e1-ac36-0002a5d5c51b'
+peak_acceleration_characteristic = '00000008-0002-11e1-ac36-0002a5d5c51b'
+freq_domain_characteristic = '00000009-0002-11e1-ac36-0002a5d5c51b'
+
+
+def on_command(msg: C2dCommand):
+    print("Received command", msg.command_name, msg.command_args, msg.ack_id)
+    if msg.command_name == "set-user-led":
+        if len(msg.command_args) == 3:
+            # pretend that we actually RGB values
+            status_message = "Setting User LED to R:%d G:%d B:%d" % (int(msg.command_args[0]), int(msg.command_args[1]), int(msg.command_args[2]))
+            c.send_command_ack(msg, C2dAck.CMD_SUCCESS_WITH_ACK, status_message)
+            print(status_message)
+        else:
+            c.send_command_ack(msg, C2dAck.CMD_FAILED, "Expected 3 arguments")
+            print("Expected three command arguments, but got", len(msg.command_args))
+    else:
+        print("Command %s not implemented!" % msg.command_name)
+        # You can send a failure ack for unrecognised commands, but other components may be servicing those commands,
+        # so we should not do this for Greengrass unless we know that we will be the only /IOTCONNECT component running
+        #
+        # if msg.ack_id is not None:  # it could be a command without "Acknowledgement Required" flag in the device template
+        #    c.send_command_ack(msg, C2dAck.CMD_FAILED, "Not Implemented")
+
+
+def setup_bluetooth():
+    setup_process = pexpect.spawn('bluetoothctl', encoding='utf-8')
+    setup_process.expect('#')
+    setup_process.sendline('power off')
+    time.sleep(1)
+    setup_process.sendline('power on')
+    time.sleep(1)
+    setup_process.close()
+
+
+def temperature_data_handler(characteristic: BleakGATTCharacteristic, data: bytearray):
+    with telemetry_lock:
+        telemetry['temperature_deg_C'] = int.from_bytes(data[2:4], 'little') / 10.0
+
+
+def battery_data_handler(characteristic: BleakGATTCharacteristic, data: bytearray):
+    with telemetry_lock:
+        telemetry['battery_percentage'] = int.from_bytes(data[2:4], 'little') / 10.0
+        telemetry['battery_voltage'] = int.from_bytes(data[4:6], 'little') / 1000.0
+        telemetry['battery_current'] = int.from_bytes(data[6:8], 'little')
+        status_options = ['Low Battery', 'Discharging', 'Plugged not Charging', 'Charging', 'Unknown']
+        telemetry['battery_status'] = status_options[data[8]]
+
+
+def freq_domain_data_handler(characteristic: BleakGATTCharacteristic, data: bytearray):
+    with telemetry_lock:
+        status_options = ['Good', 'Warning', 'Alert']
+        data_binary_str = format(int.from_bytes((data)), '#0122b')[2:]
+        telemetry['freq_status_x'] = status_options[int(data_binary_str[18:20], 2)]
+        telemetry['freq_status_y'] = status_options[int(data_binary_str[20:22], 2)]
+        telemetry['freq_status_z'] = status_options[int(data_binary_str[22:24], 2)]
+        telemetry['freq_x_hz'] = (struct.unpack('<H', data[3:5])[0]) / 10.0
+        telemetry['freq_max_amp_x_ms2'] = (struct.unpack('<H', data[5:7])[0]) / 100.0
+        telemetry['freq_y_hz'] = (struct.unpack('<H', data[7:9])[0]) / 10.0
+        telemetry['freq_max_amp_y_ms2'] = (struct.unpack('<H', data[9:11])[0]) / 100.0
+        telemetry['freq_z_hz'] = (struct.unpack('<H', data[11:13])[0]) / 10.0
+        telemetry['freq_max_amp_z_ms2'] = (struct.unpack('<H', data[13:15])[0]) / 100.0
+
+
+def accel_gyro_data_handler(characteristic: BleakGATTCharacteristic, data: bytearray):
+    with telemetry_lock:
+        telemetry['accel_x_mGs'] = int.from_bytes(data[2:4], byteorder='little', signed=True) / 1000.0
+        telemetry['accel_y_mGs'] = int.from_bytes(data[4:6], byteorder='little', signed=True) / 1000.0
+        telemetry['accel_z_mGs'] = int.from_bytes(data[6:8], byteorder='little', signed=True) / 1000.0
+        telemetry['gyro_x_dps'] = int.from_bytes(data[8:10], byteorder='little', signed=True) / 10.0
+        telemetry['gyro_y_dps'] = int.from_bytes(data[10:12], byteorder='little', signed=True) / 10.0
+        telemetry['gyro_z_dps'] = int.from_bytes(data[12:14], byteorder='little', signed=True) / 10.0
+
+
+def peak_accel_data_handler(characteristic: BleakGATTCharacteristic, data: bytearray):
+    with telemetry_lock:
+        status_options = ['Good', 'Warning', 'Alert']
+        data_binary_str = format(int.from_bytes((data)), '#0122b')[2:]
+        telemetry['accel_peak_status_x'] = status_options[int(data_binary_str[18:20], 2)]
+        telemetry['accel_peak_status_y'] = status_options[int(data_binary_str[20:22], 2)]
+        telemetry['accel_peak_status_z'] = status_options[int(data_binary_str[22:24], 2)]
+        telemetry['accel_peak_x_ms2'] = struct.unpack('<f', data[3:7])[0]
+        telemetry['accel_peak_y_ms2'] = struct.unpack('<f', data[7:11])[0]
+        telemetry['accel_peak_z_ms2'] = struct.unpack('<f', data[11:15])[0]
+
+
+def rms_speed_data_handler(_, data: bytearray):
+    with telemetry_lock:
+        status_options = ['Good', 'Warning', 'Alert']
+        data_binary_str = format(int.from_bytes((data)), '#0122b')[2:]
+        telemetry['rms_speed_status_x'] = status_options[int(data_binary_str[18:20], 2)]
+        telemetry['rms_speed_status_y'] = status_options[int(data_binary_str[20:22], 2)]
+        telemetry['rms_speed_status_z'] = status_options[int(data_binary_str[22:24], 2)]
+        telemetry['rms_speed_x_mmps'] = struct.unpack('<f', data[3:7])[0]
+        telemetry['rms_speed_y_mmps'] = struct.unpack('<f', data[7:11])[0]
+        telemetry['rms_speed_z_mmps'] = struct.unpack('<f', data[11:15])[0]
+
+
+async def proteus_setup():
+    setup_bluetooth()
+    print('starting scan...')
+    device = await BleakScanner.find_device_by_name('PROTEUS')
+    if device is None:
+        print('ERROR: could not find PROTEUS device')
+        return
+    print('Connecting to device...')
+    async with BleakClient(device) as client:
+        print('Connected')
+        await client.start_notify(accel_and_gyro_characteristic, accel_gyro_data_handler)
+        await client.start_notify(rms_speed_characteristic, rms_speed_data_handler)
+        await client.start_notify(peak_acceleration_characteristic, peak_accel_data_handler)
+        await client.start_notify(freq_domain_characteristic, freq_domain_data_handler)
+        await client.start_notify(temperature_characteristic, temperature_data_handler)
+        await client.start_notify(battery_characteristic, battery_data_handler)
+        while True:
+            await asyncio.sleep(1)
+
+
+def proteus_loop():
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(proteus_setup())
+    except Exception as e:
+        print(f"[proteus_loop] Exception: {e}")
+    finally:
+        asyncio.get_event_loop().close()
+
+
+def start_proteus_thread():
+    global proteus_thread
+    proteus_thread = threading.Thread(target=proteus_loop, daemon=True)
+    proteus_thread.start()
+
+
+# ----------- MAIN ------------
+proteus_thread = None
+start_proteus_thread()
+
+try:
+    c = Client(
+        callbacks=Callbacks(
+            command_cb=on_command
+        )
+    )
+    last_check_time = time.time()
+
+    while True:
+        # Send telemetry
+        with telemetry_lock:
+            current_telemetry = telemetry.copy()
+        c.send_telemetry(current_telemetry)
+
+        # Every 60 seconds, check if thread is alive
+        now = time.time()
+        if now - last_check_time >= 60:
+            last_check_time = now
+            if not proteus_thread.is_alive():
+                print("[main] Proteus thread not running. Restarting...")
+                start_proteus_thread()
+
+        time.sleep(3)
+
+except Exception as e:
+    print(e)
+    if proteus_thread and proteus_thread.is_alive():
+        proteus_thread.join()
+    sys.exit(1)
+
+except KeyboardInterrupt:
+    print('Exiting.')
+    if proteus_thread and proteus_thread.is_alive():
+        proteus_thread.join()
+    sys.exit(0)
