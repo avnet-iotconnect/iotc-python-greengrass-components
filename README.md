@@ -28,7 +28,7 @@ Download the pre-built component [here](https://downloads.iotconnect.io/greengra
 # PROTEUS BLE Demo
 
 This demo reads and decodes BLE data transferred by the STEVAL-PROTEUS1 Sensor Pack before packaging up the data as 
-telemetry and sending it to IOTCONNECT. The data includes fields regarding the battery health of the PROTEUS as well 
+telemetry and sending it to /IOTCONNECT. The data includes fields regarding the battery health of the PROTEUS as well 
 as acceleration, gyroscope, temperature, and frequency readings.
 
 Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-proteus-ble-1.0.0.zip)
@@ -36,7 +36,7 @@ Download the pre-built component [here](https://downloads.iotconnect.io/greengra
 # SensorTileBox Pro BLE Demo
 
 This demo reads and decodes BLE data transferred by the ST SensorTileBox Pro Sensor Pack before packaging up the data 
-as telemetry and sending it to IOTCONNECT. The data includes fields regarding the battery health of the SensorTileBoxPro 
+as telemetry and sending it to /IOTCONNECT. The data includes fields regarding the battery health of the SensorTileBoxPro 
 as well as acceleration, gyroscope, temperature, magnetic field, and pressure readings.
 
 Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-sensortileboxpro-ble-1.0.0.zip)
