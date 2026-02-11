@@ -41,7 +41,7 @@ Manifests:
       # that enforces a globally unique name (zip may be renamed to include a version)
       install:
         RequiresPrivilege: true
-        Timeout: 600
+        Timeout: 6000
         Script: |
           bash -x {artifacts:decompressedPath}/st-ai-vision*/wrapper/system-setup.sh
           sudo -i -u weston env \
