@@ -71,9 +71,10 @@
                     "unit": "",
                     "attributeColor": ""
                 }
-            ],
-    "commands": [
+            ]
+        }
     ],
+    "commands": [],
     "messageVersion": "2.1",
     "msgCode": "XG4EXYL",
     "capability": "4",
