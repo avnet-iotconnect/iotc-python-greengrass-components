@@ -819,6 +819,7 @@ class OverlayWindow(Gtk.Window):
 
             # Outputs are not in same order for ssd_mobilenet v1 and v2, outputs are already filtered by score in
             # ssd_mobilenet_v2 which is not the case for v1
+            frame_detections = []
             for i in range(np.array(self.app.nn_result_scores).size):
                 if self.app.nn.model_type == "ssd_mobilenet_v2":
                     # Scale NN outputs for the display before drawing
@@ -839,7 +840,7 @@ class OverlayWindow(Gtk.Window):
                     cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
                     text_to_display = label + " " + str(int(accuracy)) + "%"
                     print(text_to_display)
-                    self.app.last_detection = Detection(label=label, confidence=int(accuracy))
+                    frame_detections.append(Detection(label=label, confidence=int(accuracy)))
                     cr.show_text(text_to_display)
                 elif (self.app.nn.model_type == "ssd_mobilenet_v1" and self.app.nn_result_scores[0][i] > args.conf_threshold ):
                     # Scale NN outputs for the display before drawing
@@ -860,8 +861,9 @@ class OverlayWindow(Gtk.Window):
                     cr.move_to(x , (y - (self.ui_cairo_font_size/2)))
                     text_to_display = label + " " + str(int(accuracy)) + "%"
                     print(text_to_display)
-                    self.app.last_detection = Detection(label=label, confidence=int(accuracy))
+                    frame_detections.append(Detection(label=label, confidence=int(accuracy)))
                     cr.show_text(text_to_display)
+            self.app.last_detections = sorted(frame_detections, key=lambda d: d.confidence, reverse=True)
         return True
 
     def still_picture(self,  widget, event):
@@ -901,7 +903,7 @@ class Application:
         self.label_to_display = ""
 
         self.c: Optional[Client] = None  # forward declaration
-        self.last_detection: Optional[Detection] = None  # What we detected last in the draw() loop
+        self.last_detections: list[Detection] = []  # Detections from last draw() loop, sorted by confidence
 
         #if args.image is empty -> camera preview mode else still picture
         if args.image == "":
@@ -1323,20 +1325,36 @@ class Application:
         return True
 
     def iotconnect_send_telemetry_periodic_timer(self) -> bool:
-        if self.last_detection is not None:
+        if self.last_detections:
+            detections = self.last_detections[:3]
+            labels = ['none', 'none', 'none']
+            confidences = [0, 0, 0]
+            for i, d in enumerate(detections):
+                labels[i] = d.label
+                confidences[i] = d.confidence
+            objects_str = ', '.join(f'{d.label}({d.confidence}%)' for d in detections)
             if self.c is not None:
                 self.c.send_telemetry({
-                    'label': self.last_detection.label,
-                    'confidence': self.last_detection.confidence
+                    'objects_detected': objects_str,
+                    'detection_data': {
+                        'classification_a': labels[0],
+                        'classification_b': labels[1],
+                        'classification_c': labels[2],
+                        'confidence_a': confidences[0],
+                        'confidence_b': confidences[1],
+                        'confidence_c': confidences[2],
+                        'confidence_threshold': int(args.conf_threshold * 100),
+                        'version': '0.0'
+                    }
                 })
             else:
-                print(f'Detected {self.last_detection.label}: {str(int(self.last_detection.confidence))}%')
-            self.last_detection = None
+                print(f'Detected: {objects_str}')
+            self.last_detections = []
         return True
 
     def iotconnect_main(self):
         try:
-            self.last_detection = None
+            self.last_detections = []
             self.c = Client()
 
         except Exception as ce:
