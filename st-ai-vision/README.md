@@ -11,4 +11,4 @@ has an HDMI or an LVDS Display connected and can run Weston Graphical User Inter
 view, highlight recognizable object on the screen when they are detected and report the recognized object class and confidence 
 to /IOTCONNECT.
 
-Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-st-ai-vision-1.0.0.zip)
+Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-st-ai-vision-1.0.1.zip)

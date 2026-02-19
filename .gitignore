@@ -1,0 +1,17 @@
+# Development IDEs
+/.idea/
+/.vscode/
+
+# Python Virtual Environment while devloping etc.
+/.venv/
+
+# Build generated files
+/**/zip-build/
+/**/greengrass-build/
+/build
+/dist
+/*.gz
+/*.whl
+
+# One can add files to local-packages
+/**/local-packages/
