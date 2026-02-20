@@ -6,6 +6,16 @@ cd "$(dirname "$0")"/..
 
 sources_root="$(pwd)"
 
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export WAYLAND_DISPLAY="wayland-0"
+
+wayland_socket="${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}"
+echo "Waiting for Wayland socket at ${wayland_socket}..."
+until [ -S "${wayland_socket}" ]; do
+  sleep 2
+done
+echo "Wayland socket ready, launching demo."
+
 if [[ -f /usr/local/x-linux-ai/resources/config_board_npu.sh ]]; then
   source /usr/local/x-linux-ai/resources/config_board_npu.sh
 else
