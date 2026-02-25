@@ -72,6 +72,20 @@
                     "attributeColor": ""
                 }
             ]
+        },
+        {
+            "name": "cpu_usage_percent",
+            "type": "INTEGER",
+            "description": "",
+            "unit": "",
+            "aggregateTypes": []
+        },
+        {
+            "name": "memory_usage_percent",
+            "type": "INTEGER",
+            "description": "",
+            "unit": "",
+            "aggregateTypes": []
         }
     ],
     "commands": [],

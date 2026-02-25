@@ -28,6 +28,7 @@ import json
 import subprocess
 import re
 import os.path
+import psutil
 from os import path
 import cv2
 from PIL import Image
@@ -1345,7 +1346,9 @@ class Application:
                         'confidence_c': confidences[2],
                         'confidence_threshold': int(args.conf_threshold * 100),
                         'version': '0.0'
-                    }
+                    },
+                    'cpu_usage_percent': int(psutil.cpu_percent()),
+                    'memory_usage_percent': int(psutil.virtual_memory().percent)
                 })
             else:
                 print(f'Detected: {objects_str}')
