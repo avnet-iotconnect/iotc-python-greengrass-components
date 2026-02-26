@@ -23,7 +23,7 @@ This demo integrates with the code provided by ST and can detect objects by usin
 connected to the device. The list of trained objects is provided in
 [this list](https://github.com/avnet-iotconnect/iotc-python-lite-sdk-demos/blob/main/stm32mp157f-dk2/ai-vision/object-labels.txt).
 
-Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-st-ai-vision-1.0.3.zip)
+Download the pre-built component [here](https://downloads.iotconnect.io/greengrass/components/iotc-gg-component-st-ai-vision-1.0.4.zip)
 
 # PROTEUS BLE Demo
 
