@@ -3,7 +3,7 @@
 The ST AI Vision Component is based on our original [AI Vision Demo](https://github.com/avnet-iotconnect/iotc-python-lite-sdk-demos/tree/main/stm32mp157f-dk2/ai-vision)
 that was originally created for out [/IOTCONNECT Python Lite SDK](https://github.com/avnet-iotconnect/iotc-python-lite-sdk). 
 The demo has been tested with [STM32 MP157f-DK](https://www.st.com/en/evaluation-tools/stm32mp157f-dk2.html)
-but should be able to run other MP1 and MP2 devices.
+but should be able to run on other MP1 and MP2 devices.
 
 Once a USB UVC-Compliant Camera (such as [this](https://www.amazon.com/ALPCAM-Distortion-Compliant-Embedded-Industrial/dp/B0B1WTV1KB)) 
 is connected to the USB A port on the device and component is deployed with /IOTCONNECT, assuming your device
